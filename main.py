@@ -3,7 +3,8 @@ import time
 import threading
 from datetime import datetime
 import json
-from espsimulation import ESPSimulator
+from device_manager import device_manager
+from api_handler import handle_api_request
 
 # Configure Streamlit page
 st.set_page_config(
@@ -13,35 +14,142 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize ESP simulator in session state
-if 'esp_simulator' not in st.session_state:
-    st.session_state.esp_simulator = ESPSimulator()
-    st.session_state.esp_simulator.start()
+# Initialize device manager
+if 'device_manager_started' not in st.session_state:
+    device_manager.start()
+    st.session_state.device_manager_started = True
 
 # Initialize other session state variables
-if 'last_update' not in st.session_state:
-    st.session_state.last_update = datetime.now()
-
 if 'command_history' not in st.session_state:
     st.session_state.command_history = []
 
-def send_command(command, params=None):
-    """Send command to ESP simulator and log it"""
-    result = st.session_state.esp_simulator.send_command(command, params)
+if 'selected_device' not in st.session_state:
+    st.session_state.selected_device = None
+
+# Handle API requests first
+api_response = handle_api_request()
+if api_response:
+    st.stop()  # Stop execution if this was an API request
+
+def send_command(device_id, command, params=None):
+    """Send command to ESP device and log it"""
+    result = device_manager.send_command_to_device(device_id, command, params)
     st.session_state.command_history.append({
         'timestamp': datetime.now().strftime("%H:%M:%S"),
+        'device_id': device_id,
         'command': command,
         'params': params,
         'result': result
     })
     return result
 
-def main():
+def show_no_devices_connected():
+    """Show message when no ESP devices are connected"""
     st.title("🌱 ESP32 Irrigation Controller Dashboard")
     st.markdown("---")
     
-    # Get current ESP state
-    esp_state = st.session_state.esp_simulator.get_state()
+    # Large centered message
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("""
+        <div style="text-align: center; padding: 50px;">
+            <h2>🔌 No ESP32 Devices Connected</h2>
+            <p style="font-size: 18px; color: #666;">
+                Waiting for ESP32 devices to connect to the system...
+            </p>
+            <p style="font-size: 14px; color: #888;">
+                Make sure your ESP32 device is powered on and connected to the internet.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Connection instructions
+    st.markdown("---")
+    st.subheader("📋 Connection Instructions")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **For ESP32 Device:**
+        1. Power on your ESP32 device
+        2. Ensure it's connected to WiFi
+        3. The device should automatically register with this dashboard
+        4. Check the device's serial output for connection status
+        """)
+    
+    with col2:
+        st.markdown("""
+        **For Python Script:**
+        1. Download the `esp_client.py` script
+        2. Install required packages: `pip install requests`
+        3. Run: `python esp_client.py`
+        4. The script will simulate an ESP32 device
+        """)
+    
+    # API endpoints info
+    st.markdown("---")
+    st.subheader("🔗 API Endpoints")
+    
+    base_url = "https://deploy-esp-connection.streamlit.app"
+    
+    st.code(f"""
+# Device Registration
+{base_url}/?api=register&device_id=YOUR_DEVICE_ID&firmware=1.0.0
+
+# Send Heartbeat with Sensor Data
+{base_url}/?api=heartbeat&device_id=YOUR_DEVICE_ID&temperature=25.5&humidity=60.0&soil_moisture=45.0
+
+# Get Pending Commands
+{base_url}/?api=get_commands&device_id=YOUR_DEVICE_ID
+
+# Send Command Result
+{base_url}/?api=command_result&device_id=YOUR_DEVICE_ID&command_id=CMD_ID&success=true&message=Done
+    """)
+    
+    # Auto-refresh to check for new devices
+    time.sleep(5)
+    st.rerun()
+
+def main():
+    # Get connected devices
+    connected_devices = device_manager.get_connected_devices()
+    
+    # If no devices connected, show the no devices page
+    if not connected_devices:
+        show_no_devices_connected()
+        return
+    
+    st.title("🌱 ESP32 Irrigation Controller Dashboard")
+    st.markdown("---")
+    
+    # Device selection
+    device_ids = list(connected_devices.keys())
+    
+    # Auto-select first device if none selected or selected device is not available
+    if st.session_state.selected_device not in device_ids:
+        st.session_state.selected_device = device_ids[0]
+    
+    # Device selector in sidebar
+    with st.sidebar:
+        st.header("📱 Device Selection")
+        selected_device = st.selectbox(
+            "Select ESP32 Device",
+            device_ids,
+            index=device_ids.index(st.session_state.selected_device),
+            key="device_selector"
+        )
+        st.session_state.selected_device = selected_device
+        
+        # Show device info
+        device_data = connected_devices[selected_device]
+        st.markdown(f"**Device ID:** {selected_device}")
+        st.markdown(f"**Last Heartbeat:** {device_data['last_heartbeat'][:19]}")
+        st.markdown("---")
+    
+    # Get current ESP state for selected device
+    device_data = connected_devices[st.session_state.selected_device]
+    esp_state = device_data['state']
     
     # Sidebar for controls
     with st.sidebar:
@@ -65,20 +173,20 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🚀 Start Irrigation", use_container_width=True):
-                send_command("start_irrigation")
+                send_command(st.session_state.selected_device, "start_irrigation")
                 st.rerun()
             
             if st.button("⏹️ Stop Irrigation", use_container_width=True):
-                send_command("stop_irrigation")
+                send_command(st.session_state.selected_device, "stop_irrigation")
                 st.rerun()
         
         with col2:
             if st.button("🔄 Sync Data", use_container_width=True):
-                send_command("sync")
+                send_command(st.session_state.selected_device, "sync")
                 st.rerun()
             
             if st.button("🔃 Restart ESP", use_container_width=True):
-                send_command("restart")
+                send_command(st.session_state.selected_device, "restart")
                 st.rerun()
         
         # Zone-specific controls
@@ -88,13 +196,25 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button(f"Start Zone {selected_zone}"):
-                send_command("start_zone", selected_zone)
+                send_command(st.session_state.selected_device, "start_zone", selected_zone)
                 st.rerun()
         
         with col2:
             if st.button(f"Stop Zone {selected_zone}"):
-                send_command("stop_zone", selected_zone)
+                send_command(st.session_state.selected_device, "stop_zone", selected_zone)
                 st.rerun()
+        
+        # Sensor value controls
+        st.subheader("Set Sensor Values")
+        
+        sensor_type = st.selectbox("Sensor Type", ["temperature", "humidity", "soil_moisture", "light_level"])
+        sensor_value = st.number_input(f"Set {sensor_type.replace('_', ' ').title()}", 
+                                     min_value=0.0, max_value=100.0, value=25.0, step=0.1)
+        
+        if st.button(f"Set {sensor_type.replace('_', ' ').title()}"):
+            send_command(st.session_state.selected_device, "set_sensor_value", 
+                        {"sensor": sensor_type, "value": sensor_value})
+            st.rerun()
         
         # Auto-refresh toggle
         st.markdown("---")
@@ -210,8 +330,10 @@ def main():
         # Show last 10 commands
         recent_commands = st.session_state.command_history[-10:]
         for cmd in reversed(recent_commands):
-            with st.expander(f"{cmd['timestamp']} - {cmd['command']}", expanded=False):
+            device_info = f" [{cmd.get('device_id', 'Unknown')}]" if 'device_id' in cmd else ""
+            with st.expander(f"{cmd['timestamp']} - {cmd['command']}{device_info}", expanded=False):
                 st.json({
+                    'device_id': cmd.get('device_id', 'Unknown'),
                     'command': cmd['command'],
                     'parameters': cmd['params'],
                     'result': cmd['result']
