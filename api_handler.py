@@ -51,9 +51,9 @@ def handle_device_registration():
             'timestamp': datetime.now().isoformat()
         }
         
-        # Display API response in Streamlit (for debugging)
-        st.json(response)
-        return response
+        # Return JSON response for API clients
+        st.write(json.dumps(response))
+        st.stop()
         
     except Exception as e:
         error_response = {
@@ -61,8 +61,8 @@ def handle_device_registration():
             'message': f'Registration error: {str(e)}',
             'timestamp': datetime.now().isoformat()
         }
-        st.json(error_response)
-        return error_response
+        st.write(json.dumps(error_response))
+        st.stop()
 
 def handle_device_heartbeat():
     """Handle ESP32 heartbeat/status update"""
@@ -100,8 +100,8 @@ def handle_device_heartbeat():
             'timestamp': datetime.now().isoformat()
         }
         
-        st.json(response)
-        return response
+        st.write(json.dumps(response))
+        st.stop()
         
     except Exception as e:
         error_response = {
@@ -109,8 +109,8 @@ def handle_device_heartbeat():
             'message': f'Heartbeat error: {str(e)}',
             'timestamp': datetime.now().isoformat()
         }
-        st.json(error_response)
-        return error_response
+        st.write(json.dumps(error_response))
+        st.stop()
 
 def handle_get_commands():
     """Handle ESP32 request for pending commands"""
@@ -130,8 +130,8 @@ def handle_get_commands():
             'timestamp': datetime.now().isoformat()
         }
         
-        st.json(response)
-        return response
+        st.write(json.dumps(response))
+        st.stop()
         
     except Exception as e:
         error_response = {
@@ -139,8 +139,8 @@ def handle_get_commands():
             'message': f'Get commands error: {str(e)}',
             'timestamp': datetime.now().isoformat()
         }
-        st.json(error_response)
-        return error_response
+        st.write(json.dumps(error_response))
+        st.stop()
 
 def handle_command_result():
     """Handle ESP32 command execution result"""
@@ -168,8 +168,8 @@ def handle_command_result():
             'timestamp': datetime.now().isoformat()
         }
         
-        st.json(response)
-        return response
+        st.write(json.dumps(response))
+        st.stop()
         
     except Exception as e:
         error_response = {
@@ -177,8 +177,8 @@ def handle_command_result():
             'message': f'Command result error: {str(e)}',
             'timestamp': datetime.now().isoformat()
         }
-        st.json(error_response)
-        return error_response
+        st.write(json.dumps(error_response))
+        st.stop()
 
 def handle_state_update():
     """Handle ESP32 state update"""
@@ -217,8 +217,8 @@ def handle_state_update():
             'timestamp': datetime.now().isoformat()
         }
         
-        st.json(response)
-        return response
+        st.write(json.dumps(response))
+        st.stop()
         
     except Exception as e:
         error_response = {
@@ -226,5 +226,5 @@ def handle_state_update():
             'message': f'State update error: {str(e)}',
             'timestamp': datetime.now().isoformat()
         }
-        st.json(error_response)
-        return error_response
+        st.write(json.dumps(error_response))
+        st.stop()
