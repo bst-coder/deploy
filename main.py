@@ -3,8 +3,7 @@ import time
 import threading
 from datetime import datetime
 import json
-from device_manager import device_manager
-from api_handler import handle_api_request
+from firebase_manager import cloud_device_manager
 
 # Configure Streamlit page
 st.set_page_config(
@@ -14,10 +13,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize device manager
-if 'device_manager_started' not in st.session_state:
-    device_manager.start()
-    st.session_state.device_manager_started = True
+# Initialize cloud device manager
+if 'cloud_device_manager_started' not in st.session_state:
+    cloud_device_manager.start()
+    st.session_state.cloud_device_manager_started = True
 
 # Initialize other session state variables
 if 'command_history' not in st.session_state:
@@ -26,14 +25,9 @@ if 'command_history' not in st.session_state:
 if 'selected_device' not in st.session_state:
     st.session_state.selected_device = None
 
-# Handle API requests first
-api_response = handle_api_request()
-if api_response:
-    st.stop()  # Stop execution if this was an API request
-
 def send_command(device_id, command, params=None):
-    """Send command to ESP device and log it"""
-    result = device_manager.send_command_to_device(device_id, command, params)
+    """Send command to ESP device via cloud and log it"""
+    result = cloud_device_manager.send_command_to_device(device_id, command, params)
     st.session_state.command_history.append({
         'timestamp': datetime.now().strftime("%H:%M:%S"),
         'device_id': device_id,
@@ -45,7 +39,7 @@ def send_command(device_id, command, params=None):
 
 def show_no_devices_connected():
     """Show message when no ESP devices are connected"""
-    st.title("🌱 ESP32 Irrigation Controller Dashboard")
+    st.title("🌱 ESP32 Irrigation Controller Dashboard - Cloud")
     st.markdown("---")
     
     # Large centered message
@@ -55,7 +49,7 @@ def show_no_devices_connected():
         <div style="text-align: center; padding: 50px;">
             <h2>🔌 No ESP32 Devices Connected</h2>
             <p style="font-size: 18px; color: #666;">
-                Waiting for ESP32 devices to connect to the system...
+                Waiting for ESP32 devices to connect to the cloud system...
             </p>
             <p style="font-size: 14px; color: #888;">
                 Make sure your ESP32 device is powered on and connected to the internet.
@@ -65,7 +59,7 @@ def show_no_devices_connected():
     
     # Connection instructions
     st.markdown("---")
-    st.subheader("📋 Connection Instructions")
+    st.subheader("📋 Cloud Connection Instructions")
     
     col1, col2 = st.columns(2)
     
@@ -74,37 +68,39 @@ def show_no_devices_connected():
         **For ESP32 Device:**
         1. Power on your ESP32 device
         2. Ensure it's connected to WiFi
-        3. The device should automatically register with this dashboard
-        4. Check the device's serial output for connection status
+        3. Configure it to use the cloud endpoints
+        4. The device should automatically register
         """)
     
     with col2:
         st.markdown("""
         **For Python Script:**
-        1. Download the `esp_client.py` script
+        1. Download the `cloud_client.py` script
         2. Install required packages: `pip install requests`
-        3. Run: `python esp_client.py`
-        4. The script will simulate an ESP32 device
+        3. Run: `python cloud_client.py`
+        4. The script will connect via cloud database
         """)
     
-    # API endpoints info
+    # Cloud endpoints info
     st.markdown("---")
-    st.subheader("🔗 API Endpoints")
+    st.subheader("☁️ Cloud Communication")
     
-    base_url = "https://deploy-esp-connection.streamlit.app"
+    st.markdown("""
+    **How it works:**
+    - ESP32 devices communicate through a cloud database (Firebase/similar)
+    - Dashboard reads/writes to the same database
+    - Real-time synchronization between devices and dashboard
+    - No direct HTTP API calls needed
+    """)
     
-    st.code(f"""
-# Device Registration
-{base_url}/?api=register&device_id=YOUR_DEVICE_ID&firmware=1.0.0
-
-# Send Heartbeat with Sensor Data
-{base_url}/?api=heartbeat&device_id=YOUR_DEVICE_ID&temperature=25.5&humidity=60.0&soil_moisture=45.0
-
-# Get Pending Commands
-{base_url}/?api=get_commands&device_id=YOUR_DEVICE_ID
-
-# Send Command Result
-{base_url}/?api=command_result&device_id=YOUR_DEVICE_ID&command_id=CMD_ID&success=true&message=Done
+    st.code("""
+# ESP32 Cloud Communication Pattern:
+1. Device registers in cloud database
+2. Device sends sensor data to cloud
+3. Device polls cloud for commands
+4. Dashboard reads device data from cloud
+5. Dashboard writes commands to cloud
+6. Device executes commands and reports results
     """)
     
     # Auto-refresh to check for new devices
@@ -112,15 +108,15 @@ def show_no_devices_connected():
     st.rerun()
 
 def main():
-    # Get connected devices
-    connected_devices = device_manager.get_connected_devices()
+    # Get connected devices from cloud
+    connected_devices = cloud_device_manager.get_connected_devices()
     
     # If no devices connected, show the no devices page
     if not connected_devices:
         show_no_devices_connected()
         return
     
-    st.title("🌱 ESP32 Irrigation Controller Dashboard")
+    st.title("🌱 ESP32 Irrigation Controller Dashboard - Cloud")
     st.markdown("---")
     
     # Device selection
@@ -132,7 +128,7 @@ def main():
     
     # Device selector in sidebar
     with st.sidebar:
-        st.header("📱 Device Selection")
+        st.header("☁️ Cloud Device Selection")
         selected_device = st.selectbox(
             "Select ESP32 Device",
             device_ids,
@@ -145,6 +141,8 @@ def main():
         device_data = connected_devices[selected_device]
         st.markdown(f"**Device ID:** {selected_device}")
         st.markdown(f"**Last Heartbeat:** {device_data['last_heartbeat'][:19]}")
+        st.markdown(f"**Connection:** ☁️ Cloud")
+        st.markdown(f"**Connection:** ☁️ Cloud")
         st.markdown("---")
     
     # Get current ESP state for selected device
@@ -218,7 +216,7 @@ def main():
         
         # Auto-refresh toggle
         st.markdown("---")
-        auto_refresh = st.checkbox("Auto Refresh (5s)", value=True)
+        auto_refresh = st.checkbox("Auto Refresh (10s)", value=True)
         
         if st.button("🔄 Manual Refresh"):
             st.rerun()
@@ -323,6 +321,8 @@ def main():
         # Last update
         st.markdown("---")
         st.write(f"**Last Update:** {datetime.now().strftime('%H:%M:%S')}")
+        st.write(f"**Connection:** ☁️ Cloud")
+        st.write(f"**Connection:** ☁️ Cloud")
     
     # Command History
     st.subheader("📋 Command History")
@@ -341,9 +341,9 @@ def main():
     else:
         st.info("No commands sent yet.")
     
-    # Auto-refresh logic
+    # Auto-refresh logic for cloud (slower refresh) for cloud (slower refresh)
     if auto_refresh:
-        time.sleep(1)  # Small delay to prevent too frequent updates
+        time.sleep(2)  # Slower refresh for cloud
         st.rerun()
 
 if __name__ == "__main__":
