@@ -3,7 +3,17 @@ import time
 import threading
 from datetime import datetime
 import json
-from firebase_manager import cloud_device_manager
+# Try different cloud managers in order of preference
+try:
+    from firebase_manager_real import firebase_device_manager as cloud_device_manager
+    print("🔥 Using Firebase for cloud deployment")
+except ImportError:
+    try:
+        from api_cloud_manager import cloud_device_manager
+        print("🌐 Using API-based cloud manager")
+    except ImportError:
+        from firebase_manager import cloud_device_manager
+        print("📁 Using local file-based manager")
 
 # Configure Streamlit page
 st.set_page_config(

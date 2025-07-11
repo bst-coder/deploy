@@ -14,8 +14,17 @@ import sys
 import json
 import os
 
-# Import the cloud device manager directly
-from firebase_manager import cloud_device_manager
+# Try different cloud managers in order of preference
+try:
+    from firebase_manager_real import firebase_device_manager as cloud_device_manager
+    print("🔥 Using Firebase for cloud deployment")
+except ImportError:
+    try:
+        from api_cloud_manager import cloud_device_manager
+        print("🌐 Using API-based cloud manager")
+    except ImportError:
+        from firebase_manager import cloud_device_manager
+        print("📁 Using local file-based manager")
 
 class CloudESP32Client:
     def __init__(self, device_id=None):
