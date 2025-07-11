@@ -77,7 +77,7 @@ def show_no_devices_connected():
         **For Python Script:**
         1. Download the `cloud_client.py` script
         2. Install required packages: `pip install requests`
-        3. Run: `python cloud_client.py`
+        3. Run: `python cloud_client.py --device-id "YOUR_ESP32_001"`
         4. The script will connect via cloud database
         """)
     

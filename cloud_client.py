@@ -358,7 +358,7 @@ def main():
             else:
                 print("\n⏳ Running... Press Ctrl+C to stop")
                 print("💡 Open the cloud dashboard to see this device!")
-                print("☁️ Dashboard: https://deploy-esp-connection.streamlit.app/")
+                print("☁️ Dashboard: https://esp32-irrigation-controller.streamlit.app/")
                 while True:
                     time.sleep(1)
     
